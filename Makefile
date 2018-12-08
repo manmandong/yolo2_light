@@ -1,8 +1,9 @@
-GPU=0
-OPENCV=0
-OPENMP=0
+GPU=1
+OPENCV=1
+OPENMP=1
 AVX=0
 SSE=0
+LIBSO=1
 
 # set GPU=1 to speedup on GPU with cuDNN
 # set AVX=1, SSE=1 and OPENMP=1 to speedup on CPU (if error occurs then set AVX=0)
@@ -38,6 +39,11 @@ ARCH= -gencode arch=compute_30,code=sm_30 \
 VPATH=./src/
 EXEC=./bin/darknet
 OBJDIR=./obj/
+
+ifeq ($(LIBSO), 1)
+LIBNAMESO=darknet.so
+APPNAMESO=uselib
+endif
 
 CC=gcc
 CPP=g++
@@ -94,7 +100,17 @@ endif
 OBJS = $(addprefix $(OBJDIR), $(OBJ))
 DEPS = $(wildcard src/*.h) Makefile
 
-all: obj bash results $(EXEC)
+all: obj bash results $(EXEC) $(LIBNAMESO) $(APPNAMESO)
+
+ifeq ($(LIBSO), 1) 
+CFLAGS+= -fPIC
+
+$(LIBNAMESO): $(OBJS)
+	$(CPP) -shared -std=c++11 -fvisibility=hidden -DYOLODLL_EXPORTS $(COMMON) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+	
+$(APPNAMESO): $(LIBNAMESO)
+	$(CPP) -std=c++11 $(COMMON) $(CFLAGS) -o $@ $(LDFLAGS) -L ./ -l:$(LIBNAMESO)
+endif
 
 $(EXEC): $(OBJS)
 	$(CC) $(COMMON) $(CFLAGS) $^ -o $@ $(LDFLAGS)
